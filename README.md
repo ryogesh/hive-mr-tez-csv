@@ -2,13 +2,14 @@
 # Capture Map Reduce and Tez Job Counters
 ## Overview
 
-This repository contains the scripts to capture Map Reduce(MR) and Tez Job Counters as csv files. Comes handy when analyzing job details.
+This repository contains scripts to capture Yarn Queue usage, Map Reduce(MR) and Tez Job Counters as csv files. Comes handy when analyzing job details.
 
 ## Script Features
 - Capture MR job counters and additional information using the MR REST API
 - For MR jobs, creates a job summary and tasks details csv files
 - Capture Tez job counters and additional information using the Yarn Timeline Server API and Yarn logs command
 - For Tez jobs, creates a job counters csv file
+- Capture Yarn queue usage, can be scheduled to gather metrics periodically
 
 ## Installation
 - A Linux/Unix based system
@@ -83,3 +84,38 @@ pycurl
     Make sure the TGT is in the cache e.g. sudo kinit -kt
     /etc/security/keytab/yarn.service.keytab yarn/localhost.localdomain
     ```
+- Capturing Yarn Queue Usage
+    
+    ```
+    [user@localhost ~]$ python  yarn-queues-csv.py
+    ```
+ 
+    Additional information on the script
+    ```
+    [user@localhost ~]$ python  yarn-queues-csv.py -h
+    usage: yarn-queues-csv.py [-h] [--base_url BASE_URL] [--kerberos KERBEROS]
+                          [--TGT TGT] [--cacert CACERT] [--dir DIR]
+                          [--verbose VERBOSE]
+
+    Save Yarn queue metrics to a csv file
+
+    optional arguments:
+      -h, --help           show this help message and exit
+      --base_url BASE_URL  URL for Yarn Resource Manager, Default:
+                           http://localhost:8088
+      --kerberos KERBEROS  Kerberos Authentication enabled(y)/disabled(n),
+                           Default: Enabled(y)
+      --TGT TGT            Create TGT(kinit) enabled(y)/disabled(n), Default:
+                           Disabled(n)
+      --cacert CACERT      Location of CACERT, e.g /opt/anaconda3/lib/python2.7
+                           /site-packages/certifi/cacert.pem, Default: None
+      --dir DIR            Folder to save the csv files, Default: /home/user
+      --verbose VERBOSE    Debug Curl request, Default: n
+
+    Make sure the TGT is in the cache, if --TGT is set to n
+    ```
+    
+  Scheduling using cron to run every minute
+  ```
+  */1 * * * * python yarn-queues-csv.py >> ~/queues.log 2>&1
+  ```
