@@ -2,14 +2,13 @@
 # Capture Map Reduce and Tez Job Counters
 ## Overview
 
-This repository contains scripts to capture Yarn Queue usage, Map Reduce(MR) and Tez Job Counters as csv files. Comes handy when analyzing job details.
+This repository contains scripts to capture Hive Queries, Yarn Queue usage, Map Reduce(MR) and Tez Job Counters as csv files. Comes handy when analyzing activities on the Hadoop cluster.
 
 ## Script Features
-- Capture MR job counters and additional information using the MR REST API
-- For MR jobs, creates a job summary and tasks details csv files
-- Capture Tez job counters and additional information using the Yarn Timeline Server API and Yarn logs command
-- For Tez jobs, creates a job counters csv file
-- Capture Yarn queue usage, can be scheduled to gather metrics periodically
+- mr-jobs-csv.py: Capture MR job counters and additional information using the MR REST API. Creates a MR job summary and tasks details csv files.
+- tez-app-csv.py: Capture Tez job counters and additional information using the Yarn Timeline Server API and Yarn logs command. Creates a Tez job counters csv file.
+- yarn-queues-csv.py: Capture Yarn queue usage. Can be scheduled to gather metrics periodically.
+- hs2_log_csv.py: Extracts Hive queries and it's metrics from HiveServer2 log file. Can be scheduled to gather metrics periodically.
 
 ## Installation
 - A Linux/Unix based system
@@ -19,6 +18,37 @@ This repository contains scripts to capture Yarn Queue usage, Map Reduce(MR) and
 pycurl
 
 ### Running the scripts
+- Capturing Hive queries. Creates a csv(default), json or both file with compile, execution times, queryuser, queuename, full query and yarn application id.
+
+   ```
+   [user@localhost ~]$ python hs2_log_csv.py
+   ```    
+   
+    Additional information on the script
+    ```
+    [user@localhost ~]$ python hs2_log_csv.py -h
+    usage: hs2_log_csv.py [-h] [--logfile LOGFILE] [--dir DIR] [--periodic {y,n}]
+                          [--format {c,b,j}]
+
+    Save user queries execution metrics to a csv file
+
+    optional arguments:
+      -h, --help         show this help message and exit
+      --logfile LOGFILE  HiveServer2 Log file, Default:
+                         /var/log/hive/hiveserver2.log
+      --dir DIR          Folder to save the csv files, Default: /home/user
+      --periodic {y,n}   Capture queries periodically, use with scheduler,
+                         Default:n
+      --format {c,b,j}   File format(csv:c, json:j, both:b, Default:csv(c)
+
+    Make sure the program has access to the log file
+    ```
+        
+  Scheduling using cron to run every 15 minutes
+  ```
+  */15 * * * * python hs2_log_csv.py --format b --periodic y >> ~/queues.log 2>&1
+  ```
+
 - Capturing MR job information, requires MR jobId
 
     ```
