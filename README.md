@@ -46,7 +46,7 @@ pycurl
         
   Scheduling using cron to run every 15 minutes
   ```
-  */15 * * * * python hs2_log_csv.py --format b --periodic y >> ~/queues.log 2>&1
+  */15 * * * * python hs2_log_csv.py --format b --periodic y >> ~/hive_queries.log 2>&1
   ```
 
 - Capturing MR job information, requires MR jobId
