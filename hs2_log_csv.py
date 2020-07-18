@@ -20,6 +20,7 @@ except ImportError:
 
 _FNAME = '/var/log/hive/hiveserver2.log'
 
+
 def create_csv(csvfl, fmode, hdr, qdct):
     cols = ['queryId', 'Count', 'Query', 'user', 'queueName',
             'applicationId', 'CompileStartTime',
@@ -48,8 +49,9 @@ def get_queries(args):
     query_id = ''
     prevln = ''
     plines = 0
-    last_ts = datetime.strptime('2000-01-01 00:00:01,1', "%Y-%m-%d %H:%M:%S,%f")
-    dts = datetime.strptime('2000-01-01 00:00:01,2', "%Y-%m-%d %H:%M:%S,%f")
+    tlines = 0
+    last_ts = "2000-01-01T00:00:01,1"
+    dts = "2000-01-01T00:00:01,2"
     runfl = "%s/.queries.dat" %args.dir
     # Read the contents of last_run, use the timestamp to read the log file since last run
     # Previous incomplete queries dct will be updated and then appended to the csv file
@@ -69,37 +71,40 @@ def get_queries(args):
     with open(_FNAME) as rfl:
         mqry_lns = False
         mlns_dag = False
-        for lines, ln in enumerate(rfl):
-            tlines = lines
-            try:
-                # Check the timestamp of the log file line
-                # If < last_run - ignore , else check for multi-line query
-                dts = datetime.strptime(ln.split()[0].replace('T', ' '), "%Y-%m-%d %H:%M:%S,%f")
-            except (ValueError, IndexError):
-                # Check for the timestamp at the beginning of the line
-                # Multi-line queries does not have the timestamp
-                if mqry_lns:
-                    plines += 1
-                    query += ln.replace('\n', ' ')
-                elif mlns_dag:
-                    # Multi-line dagName
-                    plines += 1
-                    try:
-                        query_id = ln.split('callerId=')[1].rstrip(' }\n')
-                    except IndexError:
-                        # Till we get the line with callerId, continue
+        for ln in rfl:
+            tlines += 1
+            #try:
+            dts = ln.split()
+            if len(dts) > 0:
+                dts = dts[0]
+                if dts.startswith("20") and dts.count('-')==2 and dts.count(':')==2 and dts.count('T')==1:
+                    if dts >= last_ts:
+                        if mqry_lns:
+                            mqry_lns = False
+                            qdct[query_id]['Query'] = query
+                    else:
                         continue
-                    mlns_dag = False
-                    try:
-                        qdct[query_id]['sessionName'] = session_name
-                        qdct[query_id]['applicationId'] = app_id
-                    except KeyError:
-                        pass
-                continue
-            if dts >= last_ts:
-                if mqry_lns:
-                    mqry_lns = False
-                    qdct[query_id]['Query'] = query
+                else:
+                    # Check for the timestamp at the beginning of the line
+                    # Multi-line queries does not have the timestamp
+                    if mqry_lns:
+                        plines += 1
+                        query += ln.replace('\n', ' ')
+                    elif mlns_dag:
+                        # Multi-line dagName
+                        plines += 1
+                        try:
+                            query_id = ln.split('callerId=')[1].rstrip(' }\n')
+                        except IndexError:
+                            # Till we get the line with callerId, continue
+                            continue
+                        mlns_dag = False
+                        try:
+                            qdct[query_id]['sessionName'] = session_name
+                            qdct[query_id]['applicationId'] = app_id
+                        except KeyError:
+                            pass
+                    continue
             else:
                 continue
             plines += 1
