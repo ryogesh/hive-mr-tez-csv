@@ -21,22 +21,22 @@ except ImportError:
 _FNAME = '/var/log/hive/hiveserver2.log'
 
 def create_csv(csvfl, fmode, hdr, qdct):
-    cols = ['queryId', 'Query', 'user', 'queueName',
+    cols = ['queryId', 'Count', 'Query', 'user', 'queueName',
             'applicationId', 'CompileStartTime',
             'CompileEndTime', 'CompileTime',
             'ExecuteStartTime', 'ExecuteEndTime',
-            'ExecuteTime', 'sessionName']
+            'ExecuteTime', 'sessionName', 'Thread']
     with open(csvfl, fmode) as wfl:
         csvwrtr = csv.writer(wfl)
         if hdr:
             csvwrtr.writerow(cols)
         for key in qdct:
-            csvwrtr.writerow([key,
+            csvwrtr.writerow([key, qdct[key]['Count'],
                               qdct[key]['Query'], qdct[key]['user'], qdct[key]['queueName'],
                               qdct[key]['applicationId'], qdct[key]['Compile']['Start'],
                               qdct[key]['Compile']['End'], qdct[key]['Compile']['TimeTaken'],
                               qdct[key]['Execute']['Start'], qdct[key]['Execute']['End'],
-                              qdct[key]['Execute']['TimeTaken'], qdct[key]['sessionName']])
+                              qdct[key]['Execute']['TimeTaken'], qdct[key]['sessionName'], qdct[key]['Thread']])
 
 def create_json(jfl, fmode, qdct):
     with open(jfl, fmode) as wfl:
@@ -44,7 +44,9 @@ def create_json(jfl, fmode, qdct):
 
 def get_queries(args):
     qdct = {}
+    tdct = {}
     query_id = ''
+    prevln = ''
     plines = 0
     last_ts = datetime.strptime('2000-01-01 00:00:01,1', "%Y-%m-%d %H:%M:%S,%f")
     dts = datetime.strptime('2000-01-01 00:00:01,2', "%Y-%m-%d %H:%M:%S,%f")
@@ -117,7 +119,9 @@ def get_queries(args):
                                   'sessionId': '',
                                   'applicationId':'',
                                   'user':'',
-                                  'queueName':''
+                                  'queueName':'',
+                                  'Count':'',
+                                  'Thread':''
                                  }
                 mqry_lns = True
             elif 'Completed compiling command' in ln:
@@ -134,10 +138,13 @@ def get_queries(args):
                     pass
             elif 'Executing command' in ln:
                 vals = ln.split('queryId=')
-                dtm = vals[0].split()[0].replace('T', ' ')
-                qdet = vals[1].split('):')
-                query_id = qdet[0]
+                query_id = vals[1].split('):')[0]
+                vals = vals[0].split()
+                dtm = vals[0].replace('T', ' ')
+                thrd = vals[3][:-2]
+                tdct[thrd] = query_id
                 try:
+                    qdct[query_id]['Thread'] = thrd
                     qdct[query_id]['Execute']['Start'] = dtm
                 except KeyError:
                     pass
@@ -185,6 +192,16 @@ def get_queries(args):
                         qdct[query_id]['queueName'] = queue_name
                     except KeyError:
                         pass
+            elif 'RECORDS_OUT_INTERMEDIATE_Map_1' in ln and 'RECORDS_OUT_' in prevln:
+                vals = prevln.split("]:")
+                thrd = vals[0].split()[-1]
+                rcnt = vals[1].split()[-1]
+                try:
+                    query_id = tdct[thrd]
+                    qdct[query_id]['Count'] = rcnt
+                except KeyError:
+                    pass
+            prevln = ln # store the previous ln, for query row count, see above 
     sdct = {}
     if qdct:
         # Query partial details in log file: save and publish on next run
@@ -217,7 +234,7 @@ def get_queries(args):
             jfl = "%s/%s_incomplete_queries_%s.json" %(args.dir, socket.gethostname(), date.today())
             create_json(jfl, 'w', sdct)
 
-    print("Log file, Total lines: %s, Processed:%s, Total queries:%s" %(tlines, plines, len(qdct)))
+    print("Log file, Total lines: %s, Processed:%s, Total queries:%s" %(tlines+1, plines, len(qdct)))
     if args.periodic == 'y':
         #Store last run details in .dat file
         datdct = {'ts':dts, 'queries':sdct}
