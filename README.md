@@ -8,8 +8,8 @@ This repository contains scripts to capture Hive Queries, Yarn Queue usage, Map 
 - mr-jobs-csv.py: Capture MR job counters and additional information using the MR REST API. Creates a MR job summary and tasks details csv files.
 - tez-app-csv.py: Capture Tez job counters and additional information using the Yarn Timeline Server API and Yarn logs command. Creates a Tez job counters csv file.
 - yarn-queues-csv.py: Capture Yarn queue usage. Can be scheduled to gather metrics periodically.
-- hs2_log_csv.py: Extracts Hive queries and it's metrics from HiveServer2 log file. Can be scheduled to gather metrics periodically.
-- hs2llap_log_csv.py: Extracts Hive LLAP queries and it's metrics from HiveServer2Interactive log file. Can be scheduled to gather metrics periodically.
+- hs2_log_csv.py: Extracts Hive queries information including compile time, execution time, total rows from HiveServer2 log file. Can be scheduled to gather metrics periodically.
+- hs2llap_log_csv.py: Extracts Hive LLAP queries information including compile time, execution time, total rows from HiveServer2Interactive log file. Can be scheduled to gather metrics periodically.
 
 ## Installation
 - A Linux/Unix based system
