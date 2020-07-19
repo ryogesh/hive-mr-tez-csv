@@ -21,21 +21,21 @@ except ImportError:
 _FNAME = '/var/log/hive/hiveserver2Interactive.log'
 
 def create_csv(csvfl, fmode, hdr, qdct):
-    cols = ['queryId', 'Query',
+    cols = ['queryId', 'Count', 'Query',
             'applicationId', 'CompileStartTime',
             'CompileEndTime', 'CompileTime',
             'ExecuteStartTime', 'ExecuteEndTime',
-            'ExecuteTime']
+            'ExecuteTime', 'Thread']
     with open(csvfl, fmode) as wfl:
         csvwrtr = csv.writer(wfl)
         if hdr:
             csvwrtr.writerow(cols)
         for key in qdct:
-            csvwrtr.writerow([key, qdct[key]['Query'],
+            csvwrtr.writerow([key, qdct[key]['Count'], qdct[key]['Query'],
                               qdct[key]['applicationId'], qdct[key]['Compile']['Start'],
                               qdct[key]['Compile']['End'], qdct[key]['Compile']['TimeTaken'],
                               qdct[key]['Execute']['Start'], qdct[key]['Execute']['End'],
-                              qdct[key]['Execute']['TimeTaken']])
+                              qdct[key]['Execute']['TimeTaken'], qdct[key]['Thread']])
 
 def create_json(jfl, fmode, qdct):
     with open(jfl, fmode) as wfl:
@@ -43,10 +43,13 @@ def create_json(jfl, fmode, qdct):
 
 def get_queries(args):
     qdct = {}
+    tdct = {}
     query_id = ''
+    prevln = ''
     plines = 0
-    last_ts = datetime.strptime('2000-01-01 00:00:01,1', "%Y-%m-%d %H:%M:%S,%f")
-    dts = datetime.strptime('2000-01-01 00:00:01,2', "%Y-%m-%d %H:%M:%S,%f")
+    tlines = 0
+    last_ts = "2000-01-01T00:00:01,1"
+    dts = "2000-01-01T00:00:01,2"
     runfl = "%s/.queries.dat" %args.dir
     # Read the contents of last_run, use the timestamp to read the log file since last run
     # Previous incomplete queries dct will be updated and then appended to the csv file
@@ -66,36 +69,38 @@ def get_queries(args):
     with open(_FNAME) as rfl:
         mqry_lns = False
         mlns_dag = False
-        for lines, ln in enumerate(rfl):
-            tlines = lines
-            try:
-                # Check the timestamp of the log file line
-                # If < last_run - ignore , else check for multi-line query
-                dts = datetime.strptime(ln.split()[0].replace('T', ' '), "%Y-%m-%d %H:%M:%S,%f")
-            except (ValueError, IndexError):
-                # Check for the timestamp at the beginning of the line
-                # Multi-line queries does not have the timestamp
-                if mqry_lns:
-                    plines += 1
-                    query += ln.replace('\n', ' ')
-                elif mlns_dag:
-                    # Multi-line dagName
-                    plines += 1
-                    try:
-                        query_id = ln.split('callerId=')[1].rstrip(' }\n')
-                    except IndexError:
-                        # Till we get the line with callerId, continue
+        for ln in rfl:
+            tlines += 1
+            dts = ln.split()
+            if len(dts) > 0:
+                dts = dts[0]
+                if dts.startswith("20") and dts.count('-')==2 and dts.count(':')==2 and dts.count('T')==1:
+                    if dts >= last_ts:
+                        if mqry_lns:
+                            mqry_lns = False
+                            qdct[query_id]['Query'] = query
+                    else:
                         continue
-                    mlns_dag = False
-                    try:
-                        qdct[query_id]['applicationId'] = app_id
-                    except KeyError:
-                        pass
-                continue
-            if dts >= last_ts:
-                if mqry_lns:
-                    mqry_lns = False
-                    qdct[query_id]['Query'] = query
+                else:
+                    # Check for the timestamp at the beginning of the line
+                    # Multi-line queries does not have the timestamp
+                    if mqry_lns:
+                        plines += 1
+                        query += ln.replace('\n', ' ')
+                    elif mlns_dag:
+                        # Multi-line dagName
+                        plines += 1
+                        try:
+                            query_id = ln.split('callerId=')[1].rstrip(' }\n')
+                        except IndexError:
+                            # Till we get the line with callerId, continue
+                            continue
+                        mlns_dag = False
+                        try:
+                            qdct[query_id]['applicationId'] = app_id
+                        except KeyError:
+                            pass
+                    continue
             else:
                 continue
             plines += 1
@@ -115,7 +120,9 @@ def get_queries(args):
                                   'sessionId': '',
                                   'applicationId':'',
                                   'user':'',
-                                  'queueName':''
+                                  'queueName':'',
+                                  'Count':'',
+                                  'Thread':''
                                  }
                 mqry_lns = True
             elif 'Completed compiling command' in ln:
@@ -132,10 +139,13 @@ def get_queries(args):
                     pass
             elif 'Executing command' in ln:
                 vals = ln.split('queryId=')
-                dtm = vals[0].split()[0].replace('T', ' ')
-                qdet = vals[1].split('):')
-                query_id = qdet[0]
+                query_id = vals[1].split('):')[0]
+                vals = vals[0].split()
+                dtm = vals[0].replace('T', ' ')
+                thrd = vals[3][:-2]
+                tdct[thrd] = query_id
                 try:
+                    qdct[query_id]['Thread'] = thrd
                     qdct[query_id]['Execute']['Start'] = dtm
                 except KeyError:
                     pass
@@ -164,6 +174,16 @@ def get_queries(args):
                     qdct[query_id]['applicationId'] = app_id
                 except KeyError:
                     pass
+            elif 'RECORDS_OUT_INTERMEDIATE_Map_1:' in ln and 'RECORDS_OUT_' in prevln:
+                vals = prevln.split("]:")
+                thrd = vals[0].split()[-1]
+                rcnt = vals[1].split()[-1]
+                try:
+                    query_id = tdct[thrd]
+                    qdct[query_id]['Count'] = rcnt
+                except KeyError:
+                    pass
+            prevln = ln # store the previous ln, for query row count, see above 
     sdct = {}
     if qdct:
         # Query partial details in log file: save and publish on next run
