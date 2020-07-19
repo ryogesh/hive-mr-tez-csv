@@ -73,7 +73,6 @@ def get_queries(args):
         mlns_dag = False
         for ln in rfl:
             tlines += 1
-            #try:
             dts = ln.split()
             if len(dts) > 0:
                 dts = dts[0]
@@ -197,7 +196,7 @@ def get_queries(args):
                         qdct[query_id]['queueName'] = queue_name
                     except KeyError:
                         pass
-            elif 'RECORDS_OUT_INTERMEDIATE_Map_1' in ln and 'RECORDS_OUT_' in prevln:
+            elif 'RECORDS_OUT_INTERMEDIATE_Map_1:' in ln and 'RECORDS_OUT_' in prevln:
                 vals = prevln.split("]:")
                 thrd = vals[0].split()[-1]
                 rcnt = vals[1].split()[-1]
